@@ -12,8 +12,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 
 public abstract class NetworkBlockEntity<T extends ActiveTile<T>> extends ActiveTile<T> implements ITickableBlockEntity<T> {
 
@@ -23,23 +21,20 @@ public abstract class NetworkBlockEntity<T extends ActiveTile<T>> extends Active
         super(base, blockEntityType, pos, state);
     }
 
-    @OnlyIn(Dist.CLIENT)
     @Override
     public void initClient() {
         super.initClient();
     }
 
     @Override
-    public void clearRemoved() {
-        super.clearRemoved();
+    public void onLoad() {
+        super.onLoad();
         if (level instanceof ServerLevel serverLevel) {
-            serverLevel.getServer().submitAsync(() -> {
-                NetworkManager networkManager = NetworkManager.get(level);
-
-                if (networkManager.getElement(worldPosition) == null) {
-                    networkManager.addElement(createElement(level, worldPosition));
-                }
-            });
+            NetworkManager networkManager = NetworkManager.get(serverLevel);
+            if (networkManager.getElement(worldPosition) == null) {
+                var element = createElement(serverLevel, worldPosition);
+                networkManager.addElement(element);
+            }
         }
     }
 

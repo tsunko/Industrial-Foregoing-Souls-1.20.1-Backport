@@ -6,6 +6,7 @@ import com.buuz135.industrialforegoingsouls.tag.SoulTags;
 import com.hrznstudio.titanium.annotation.Save;
 import com.hrznstudio.titanium.block.BasicTileBlock;
 import com.hrznstudio.titanium.block.RotatableBlock;
+import com.hrznstudio.titanium.block_network.NetworkManager;
 import com.hrznstudio.titanium.block_network.element.NetworkElement;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -38,18 +39,18 @@ public class SoulSurgeBlockEntity extends NetworkBlockEntity<SoulSurgeBlockEntit
     public void serverTick(Level level, BlockPos pos, BlockState state, SoulSurgeBlockEntity blockEntity) {
         super.serverTick(level, pos, state, blockEntity);
         if (state.getValue(SoulSurgeBlock.ENABLED)) {
+            if (NetworkManager.get(this.level).getElement(worldPosition) == null) return;
             if (tickingTime <= 0) {
                 var network = getNetwork();
-                for (NetworkElement soulLaserDrill : network.getSoulLaserDrills()) {
-                    var soulTile = soulLaserDrill.getLevel().getBlockEntity(soulLaserDrill.getPos());
-                    if (soulTile instanceof SoulLaserBaseBlockEntity soulLaserBaseBlockEntity && soulLaserBaseBlockEntity.getSoulAmount() > 0) {
-                        soulLaserBaseBlockEntity.useSoul();
+                if (network != null) {
+                    if (network.getSoulAmount() > 0) {
+                        network.useSoul(this.level);
                         tickingTime = ConfigSoulSurge.SOUL_TIME;
-                        break;
                     }
                 }
             }
             if (tickingTime > 0) {
+                if (!level.isLoaded(pos.relative(state.getValue(RotatableBlock.FACING_ALL).getOpposite()))) return;
                 var targetingState = level.getBlockState(pos.relative(state.getValue(RotatableBlock.FACING_ALL).getOpposite()));
                 if (!targetingState.is(Blocks.AIR) && !targetingState.is(SoulTags.Blocks.CANT_ACCELERATE) && !targetingState.is(SoulTags.Blocks.FORGE_CANT_ACCELERATE)) {
                     BlockEntity targetingTile = level.getBlockEntity(pos.relative(state.getValue(RotatableBlock.FACING_ALL).getOpposite()));

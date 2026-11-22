@@ -28,7 +28,6 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 public class SoulSurgeBlock extends BasicTileBlock<SoulSurgeBlockEntity> implements INetworkDirectionalConnection, SimpleWaterloggedBlock {

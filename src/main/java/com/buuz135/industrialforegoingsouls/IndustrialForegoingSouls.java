@@ -3,22 +3,28 @@ package com.buuz135.industrialforegoingsouls;
 import com.buuz135.industrialforegoingsouls.block.SoulLaserBaseBlock;
 import com.buuz135.industrialforegoingsouls.block.SoulPipeBlock;
 import com.buuz135.industrialforegoingsouls.block.SoulSurgeBlock;
+import com.buuz135.industrialforegoingsouls.block.tile.SoulLaserBaseBlockEntity;
 import com.buuz135.industrialforegoingsouls.block_network.DefaultSoulNetworkElement;
 import com.buuz135.industrialforegoingsouls.block_network.SoulNetwork;
+import com.buuz135.industrialforegoingsouls.capabilities.SLBSoulCap;
+import com.buuz135.industrialforegoingsouls.capabilities.SoulCapabilities;
 import com.buuz135.industrialforegoingsouls.data.*;
 import com.hrznstudio.titanium.block_network.NetworkRegistry;
 import com.hrznstudio.titanium.block_network.element.NetworkElementRegistry;
 import com.hrznstudio.titanium.datagenerator.loot.TitaniumLootTableProvider;
 import com.hrznstudio.titanium.datagenerator.model.BlockItemModelGeneratorProvider;
+import com.hrznstudio.titanium.event.handler.EventManager;
 import com.hrznstudio.titanium.module.ModuleController;
 import com.hrznstudio.titanium.network.NetworkHandler;
 import com.hrznstudio.titanium.tab.TitaniumTab;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent;
 import net.minecraftforge.common.util.NonNullLazy;
 import net.minecraftforge.data.event.GatherDataEvent;
 import net.minecraftforge.fml.DistExecutor;
@@ -49,7 +55,6 @@ public class IndustrialForegoingSouls extends ModuleController {
         NetworkElementRegistry.INSTANCE.addFactory(DefaultSoulNetworkElement.ID, new DefaultSoulNetworkElement.Factory());
     }
 
-
     @Override
     protected void initModules() {
         this.addCreativeTab("main", () -> new ItemStack(SOUL_LASER_BLOCK.getKey().get()), MOD_ID, TAB);
@@ -78,8 +83,7 @@ public class IndustrialForegoingSouls extends ModuleController {
         event.getGenerator().addProvider(true, new BlockItemModelGeneratorProvider(event.getGenerator(), MOD_ID, blocksToProcess));
         event.getGenerator().addProvider(true, new TitaniumLootTableProvider(event.getGenerator(), blocksToProcess));
         event.getGenerator().addProvider(true, new IFSoulsRecipeProvider(event.getGenerator()));
-        event.getGenerator().addProvider(true, new IFSoulsSerializableRecipe(event.getGenerator(), MOD_ID));
         event.getGenerator().addProvider(true, new IFSoulsTagProvider(event.getGenerator().getPackOutput(), event.getLookupProvider(), MOD_ID, event.getExistingFileHelper()));
-        event.getGenerator().addProvider(true, new IFSoulsBlockstateProvider(event.getGenerator().getPackOutput(), MOD_ID, event.getExistingFileHelper()));
+        event.getGenerator().addProvider(true, new IFSoulsBiomeTagProvider(event.getGenerator().getPackOutput(), event.getLookupProvider(), MOD_ID, event.getExistingFileHelper()));
     }
 }

@@ -2,6 +2,7 @@ package com.buuz135.industrialforegoingsouls.block;
 
 import com.buuz135.industrialforegoingsouls.IndustrialForegoingSouls;
 import com.buuz135.industrialforegoingsouls.block.tile.SoulPipeBlockEntity;
+import com.buuz135.industrialforegoingsouls.capabilities.SoulCapabilities;
 import com.buuz135.industrialforegoingsouls.config.IFSoulsClient;
 import com.google.common.collect.ImmutableMap;
 import com.hrznstudio.titanium.block.BasicTileBlock;
@@ -32,6 +33,7 @@ import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraftforge.fluids.capability.IFluidHandler;
 import org.apache.commons.lang3.mutable.MutableObject;
 
 import javax.annotation.Nullable;
@@ -69,7 +71,7 @@ public class SoulPipeBlock extends BasicTileBlock<SoulPipeBlockEntity> implement
 
     @Override
     public BlockEntityType.BlockEntitySupplier<?> getTileEntityFactory() {
-        return (pos, state) -> new SoulPipeBlockEntity(this, IndustrialForegoingSouls.SOUL_PIPE_BLOCK.getRight().get(), pos, state);
+        return (pos, state) -> new SoulPipeBlockEntity(this, IndustrialForegoingSouls.SOUL_PIPE_BLOCK.getValue().get(), pos, state);
     }
 
     @Override
@@ -93,10 +95,14 @@ public class SoulPipeBlock extends BasicTileBlock<SoulPipeBlockEntity> implement
 
     protected PipeState getConnectionType(Level world, BlockPos pos, Direction direction, BlockState state) {
         var relativeState = world.getBlockState(pos.relative(direction));
-        if (relativeState.getBlock() instanceof SoulPipeBlock || relativeState.getBlock() instanceof SoulSurgeBlock || relativeState.getBlock().equals(Blocks.STONE_BRICKS)) {
+        if (relativeState.getBlock() instanceof SoulPipeBlock || relativeState.getBlock() instanceof SoulSurgeBlock) {
             return PipeState.PIPE;
         }
         if (relativeState.getBlock() instanceof INetworkDirectionalConnection networkDirectionalConnection && networkDirectionalConnection.canConnect(relativeState, direction.getOpposite())) {
+            return PipeState.BLOCK;
+        }
+        var relativeEntity = world.getBlockEntity(pos.relative(direction));
+        if (relativeEntity != null && relativeEntity.getCapability(SoulCapabilities.BLOCK, direction.getOpposite()).isPresent()){
             return PipeState.BLOCK;
         }
         return PipeState.NO;
@@ -154,11 +160,6 @@ public class SoulPipeBlock extends BasicTileBlock<SoulPipeBlockEntity> implement
     }
 
     @Override
-    public boolean canConnect(BlockState state, Direction direction) {
-        return true;
-    }
-
-    @Override
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
         for (Direction direction : Direction.values()) {
             var connected = state.getValue(DIRECTIONS.get(direction)) != PipeState.NO;
@@ -195,6 +196,11 @@ public class SoulPipeBlock extends BasicTileBlock<SoulPipeBlockEntity> implement
         return p_56969_.getValue(BlockStateProperties.WATERLOGGED) ? Fluids.WATER.getSource(false) : super.getFluidState(p_56969_);
     }
 
+    @Override
+    public boolean canConnect(BlockState state, Direction direction) {
+        return true;
+    }
+
     public enum PipeState implements StringRepresentable {
         NO,
         PIPE,
@@ -202,7 +208,7 @@ public class SoulPipeBlock extends BasicTileBlock<SoulPipeBlockEntity> implement
 
         @Override
         public String getSerializedName() {
-            return this.name().toLowerCase();
+            return this.name().toLowerCase(Locale.ROOT);
         }
     }
 }

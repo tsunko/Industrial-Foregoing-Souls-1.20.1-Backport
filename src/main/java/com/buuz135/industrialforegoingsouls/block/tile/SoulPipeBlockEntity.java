@@ -1,5 +1,7 @@
 package com.buuz135.industrialforegoingsouls.block.tile;
 
+import com.buuz135.industrialforegoingsouls.capabilities.ISoulHandler;
+import com.buuz135.industrialforegoingsouls.capabilities.SoulCapabilities;
 import com.hrznstudio.titanium.annotation.Save;
 import com.hrznstudio.titanium.block.BasicTileBlock;
 import net.minecraft.core.BlockPos;
@@ -7,10 +9,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.util.LazyOptional;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 public class SoulPipeBlockEntity extends NetworkBlockEntity<SoulPipeBlockEntity> {
 
@@ -25,6 +24,23 @@ public class SoulPipeBlockEntity extends NetworkBlockEntity<SoulPipeBlockEntity>
     @Override
     public void serverTick(Level level, BlockPos pos, BlockState state, SoulPipeBlockEntity blockEntity) {
         super.serverTick(level, pos, state, blockEntity);
+        for (Direction value : Direction.values()) {
+            var relBlockEntity = level.getBlockEntity(pos.relative(value));
+            if (relBlockEntity == null) continue;
+
+            relBlockEntity.getCapability(SoulCapabilities.BLOCK, value.getOpposite()).ifPresent(capability -> {
+                var network = getNetwork();
+                if (network != null) {
+                    var simulatedFill = capability.fill(4, ISoulHandler.Action.SIMULATE);
+                    var filled = capability.fill(network.drainSouls(this.level, simulatedFill), ISoulHandler.Action.EXECUTE);
+                    // don't try to fill and drain on the same tick
+                    if (filled == 0) {
+                        var simulatedDrain = capability.drain(4, ISoulHandler.Action.SIMULATE);
+                        capability.drain(network.addSouls(this.level, simulatedDrain), ISoulHandler.Action.EXECUTE);
+                    }
+                }
+            });
+        }
     }
 
     @NotNull
@@ -33,15 +49,15 @@ public class SoulPipeBlockEntity extends NetworkBlockEntity<SoulPipeBlockEntity>
         return this;
     }
 
-    @NotNull
-    @Override
-    public <U> LazyOptional<U> getCapability(@NotNull Capability<U> cap, @Nullable Direction side) {
-        return super.getCapability(cap, side);
-    }
-
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-    }
+//    @NotNull
+//    @Override
+//    public <U> LazyOptional<U> getCapability(@NotNull Capability<U> cap, @Nullable Direction side) {
+//        return super.getCapability(cap, side);
+//    }
+//
+//    @Override
+//    public void invalidateCaps() {
+//        super.invalidateCaps();
+//    }
 
 }

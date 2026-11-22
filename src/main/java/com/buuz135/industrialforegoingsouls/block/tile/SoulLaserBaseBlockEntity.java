@@ -6,6 +6,9 @@ import com.buuz135.industrial.module.ModuleCore;
 import com.buuz135.industrialforegoingsouls.IndustrialForegoingSouls;
 import com.buuz135.industrialforegoingsouls.block_network.DefaultSoulNetworkElement;
 import com.buuz135.industrialforegoingsouls.block_network.SoulNetwork;
+import com.buuz135.industrialforegoingsouls.capabilities.ISoulHandler;
+import com.buuz135.industrialforegoingsouls.capabilities.SLBSoulCap;
+import com.buuz135.industrialforegoingsouls.capabilities.SoulCapabilities;
 import com.buuz135.industrialforegoingsouls.client.SculkSoulTankScreenAddon;
 import com.buuz135.industrialforegoingsouls.config.ConfigSoulLaserBase;
 import com.hrznstudio.titanium.annotation.Save;
@@ -22,6 +25,7 @@ import com.hrznstudio.titanium.component.sideness.IFacingComponent;
 import com.hrznstudio.titanium.item.AugmentWrapper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -37,6 +41,8 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.util.LazyOptional;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -52,6 +58,8 @@ public class SoulLaserBaseBlockEntity extends IndustrialMachineTile<SoulLaserBas
     @Save
     private int soulAmount;
     private boolean unloaded;
+
+    private final LazyOptional<ISoulHandler> soulHandlerLazyOptional;
 
     public SoulLaserBaseBlockEntity(BlockPos blockPos, BlockState blockState) {
         super(IndustrialForegoingSouls.SOUL_LASER_BLOCK, blockPos, blockState);
@@ -83,11 +91,12 @@ public class SoulLaserBaseBlockEntity extends IndustrialMachineTile<SoulLaserBas
         this.addInventory(catalyst = (SidedInventoryComponent<SoulLaserBaseBlockEntity>) new SidedInventoryComponent<SoulLaserBaseBlockEntity>("lens", 50, 24 + 18, 1, 0)
                         .setColor(DyeColor.BLUE)
                         .setRange(2, 3)
+                        .setSlotToItemStackRender(0, new ItemStack(ModuleCore.LASER_LENS[11].get()))
                         .setSlotLimit(1)
                 //.setInputFilter((stack, integer) -> stack.getItem() instanceof LaserLensItem)
         );
         catalyst.getFacingModes().keySet().forEach(sideness -> catalyst.getFacingModes().put(sideness, IFacingComponent.FaceMode.NONE));
-
+        soulHandlerLazyOptional = LazyOptional.of(() -> new SLBSoulCap(this));
     }
 
     @Override
@@ -103,14 +112,14 @@ public class SoulLaserBaseBlockEntity extends IndustrialMachineTile<SoulLaserBas
     }
 
     private void onWork() {
-        if (!catalyst.getStackInSlot(0).isEmpty() && catalyst.getStackInSlot(0).getItem().equals(ModuleCore.LASER_LENS[11].get()) && this.soulAmount + ConfigSoulLaserBase.SOULS_PER_OPERATION <= ConfigSoulLaserBase.SOUL_STORAGE_AMOUNT) {
+        if (!catalyst.getStackInSlot(0).isEmpty() && catalyst.getStackInSlot(0).getItem().equals(ModuleCore.LASER_LENS[11].get()) && this.soulAmount < ConfigSoulLaserBase.SOUL_STORAGE_AMOUNT) {
             VoxelShape box = Shapes.box(-1, 0, -1, 2, 3, 2).move(this.worldPosition.getX(), this.worldPosition.getY() - 1, this.worldPosition.getZ());
             List<LivingEntity> entities = this.level.getEntitiesOfClass(LivingEntity.class, box.bounds(), entity -> entity.getType().equals(EntityType.WARDEN));
             if (entities.size() > 0) {
                 LivingEntity first = entities.get(0);
                 if (first.getHealth() > ConfigSoulLaserBase.DAMAGE_PER_OPERATION || ConfigSoulLaserBase.KILL_WARDEN) {
                     first.hurt(first.damageSources().generic(), ConfigSoulLaserBase.DAMAGE_PER_OPERATION);
-                    this.soulAmount += ConfigSoulLaserBase.SOULS_PER_OPERATION;
+                    this.soulAmount = Math.min(ConfigSoulLaserBase.SOUL_STORAGE_AMOUNT, this.soulAmount + ConfigSoulLaserBase.SOULS_PER_OPERATION);
                     syncObject(this.soulAmount);
                 }
             }
@@ -138,9 +147,11 @@ public class SoulLaserBaseBlockEntity extends IndustrialMachineTile<SoulLaserBas
         return soulAmount;
     }
 
-    public void useSoul() {
-        --this.soulAmount;
+    public int useSoul(int soulAmount) {
+        var oldAmount = this.soulAmount;
+        this.soulAmount = Math.max(0, this.soulAmount - soulAmount);
         syncObject(this.soulAmount);
+        return oldAmount - this.soulAmount;
     }
 
     @Override
@@ -167,46 +178,14 @@ public class SoulLaserBaseBlockEntity extends IndustrialMachineTile<SoulLaserBas
     }
 
     @Override
-    public void clearRemoved() {
-        super.clearRemoved();
-        if (level instanceof ServerLevel serverLevel) {
-            serverLevel.getServer().submitAsync(() -> {
-                NetworkManager networkManager = NetworkManager.get(level);
-
-                if (networkManager.getElement(worldPosition) == null) {
-                    networkManager.addElement(createElement(level, worldPosition));
-                }
-            });
-        }
+    public <T> LazyOptional<T> getCapability(Capability<T> cap, Direction side) {
+        return SoulCapabilities.BLOCK.orEmpty(cap, soulHandlerLazyOptional);
     }
 
     @Override
-    public void onChunkUnloaded() {
-        super.onChunkUnloaded();
-        unloaded = true;
+    public void invalidateCaps() {
+        super.invalidateCaps();
+        soulHandlerLazyOptional.invalidate();
     }
 
-    @Override
-    public void setRemoved() {
-        super.setRemoved();
-
-        if (!level.isClientSide && !unloaded) {
-            NetworkManager networkManager = NetworkManager.get(level);
-
-            NetworkElement pipe = networkManager.getElement(worldPosition);
-            if (pipe != null) {
-                //spawnDrops(pipe);
-            }
-
-            networkManager.removeElement(worldPosition);
-        }
-    }
-
-    protected NetworkElement createElement(Level level, BlockPos pos) {
-        return new DefaultSoulNetworkElement(level, pos);
-    }
-
-    public SoulNetwork getNetwork() {
-        return (SoulNetwork) NetworkManager.get(this.level).getElement(worldPosition).getNetwork();
-    }
 }
